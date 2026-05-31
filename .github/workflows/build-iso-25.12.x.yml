@@ -97,15 +97,7 @@ jobs:
   build_installer_iso:
     runs-on: ubuntu-22.04
     needs: build_immortalwrt
-    outputs:
-      release_tag: ${{ steps.create_tag.outputs.tag_name }}
     steps:
-      - name: Create unique tag name
-        id: create_tag
-        run: |
-          tag="ImmortalWrt-${{ github.event.inputs.luci_version }}-${{ github.event.inputs.profile }}MB-$(date +%Y%m%d%H%M)"
-          echo "tag_name=$tag" >> $GITHUB_OUTPUT
-
       - name: Download firmware artifact
         uses: actions/download-artifact@v4
         with:
@@ -121,18 +113,26 @@ jobs:
           chmod +x "${{ github.workspace }}/img-installer/custom.sh"
           chmod +x "${{ github.workspace }}/img-installer/supportFiles/custom/build.sh"
 
-      - name: ✅ 制作 25.12.x ISO
+      - name: ✅ 制作并添加时间戳重命名 ISO
         run: |
           firmware_file=$(ls *squashfs-combined-efi.img.gz)
           cd img-installer
           bash autobuild/autobuild.sh "../$firmware_file"
+          
+          # 获取当前时间戳
+          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+          # 定义包含时间戳的新名字
+          NEW_NAME="ImmortalWrt-${{ github.event.inputs.luci_version }}-${{ github.event.inputs.profile }}MB-${TIMESTAMP}.iso"
+          
+          # 重命名生成的文件
+          mv output/custom-installer-x86_64.iso "output/$NEW_NAME"
 
       - name: 🚀 上传 ISO 到 Release
         uses: softprops/action-gh-release@v2.2.1
         with:
-          tag_name: ${{ steps.create_tag.outputs.tag_name }}
+          tag_name: "Custom-Installer-x86_64-ISO"
           name: "ImmortalWrt ${{ github.event.inputs.luci_version }} - ${{ github.event.inputs.profile }}MB"
           body_path: "${{ github.workspace }}/img-installer/autobuild/info.md"
           files: |
-            img-installer/output/custom-installer-x86_64.iso
+            img-installer/output/ImmortalWrt-*.iso
           token: "${{ secrets.GITHUB_TOKEN }}"
